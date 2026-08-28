@@ -82,6 +82,17 @@ We're using **Oslo City Bike** open data - real anonymized trip data from Oslo's
 | 2 | [Silver Layer](docs/02-silver-layer.md) | `02-silver-transformation.ipynb` | Clean and transform data |
 | 3 | [Gold Layer](docs/03-gold-layer.md) | `03-gold-dimensional-model.ipynb` | Build dimensional model |
 
+### 🚀 Advanced Modules
+
+After completing Modules 0–3, continue in the [`advanced/`](advanced/README.md) folder:
+
+| Module | Documentation | Notebook | Description |
+|--------|---------------|----------|-------------|
+| 4 | [Periodic Snapshot](advanced/docs/04-periodic-snapshot.md) | `04-periodic-snapshot.ipynb` | Daily station activity snapshot fact table |
+| 5 | [Accumulating Snapshot](advanced/docs/05-accumulating-snapshot.md) | `05-accumulating-snapshot.ipynb` | Trip lifecycle fact table with milestone tracking |
+| 6 | [Station Location & Bydel](advanced/docs/06-dim-station-location.md) | `06-dim-station-location.ipynb` | Geographic dimension with Oslo district (bydel) |
+| 7 | [Weather Dimension](advanced/docs/07-dim-weather.md) | `07-dim-weather.ipynb` | Weather data source + trip-weather correlation |
+
 ---
 
 ## 🚀 Getting Started
