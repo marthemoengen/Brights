@@ -49,7 +49,7 @@ Dimensional modelling is a design technique for data warehouses that makes data:
 - Store **descriptive attributes** (the "who, what, where, when")
 - Have a **surrogate key** (artificial primary key)
 - Usually have fewer rows (hundreds/thousands)
-- Examples: DimDate, DimTime, DimStation, DimCustomer
+- Examples: DimDate, DimTime, DimStartStation, DimEndStation, DimCustomer
 
 #### 3. Star Schema
 - Central fact table connected to dimension tables
@@ -61,9 +61,15 @@ Dimensional modelling is a design technique for data warehouses that makes data:
           │   DimDate    │
           └──────┬───────┘
                  │
-┌──────────┐     │     ┌───────────┐
-│DimStation│◄────┼────►│  DimTime  │
-└──────────┘     │     └───────────┘
+┌────────────┐   │   ┌────────────┐
+│DimStart   │◄──┼──►│  DimTime   │
+│Station    │   │   └────────────┘
+└────────────┘   │
+                 │
+┌────────────┐   │
+│DimEnd      │◄──┘
+│Station     │
+└────────────┘
                  │
           ┌──────┴───────┐
           │  FactTrips   │
@@ -76,14 +82,15 @@ Dimensional modelling is a design technique for data warehouses that makes data:
 
 ### Star Schema for Oslo Bysykkel
 
-We'll create the following tables:
+We'll create the following tables in the separate `gold` schema:
 
 | Table | Type | Description |
 |-------|------|-------------|
-| `dim_date` | Dimension | Date attributes (year, month, day, etc.) |
-| `dim_time` | Dimension | Time of day attributes (hour, minute, period) |
-| `dim_station` | Dimension | Station details (name, location) |
-| `fact_trips` | Fact | Trip measurements (duration, counts) |
+| `gold.dim_date` | Dimension | Date attributes (year, month, day, etc.) |
+| `gold.dim_time` | Dimension | Time of day attributes (hour, minute, period) |
+| `gold.dim_start_station` | Type 1 dimension | Origin station details (name, location) |
+| `gold.dim_end_station` | Type 1 dimension | Destination station details (name, location) |
+| `gold.fact_trips` | Fact | Trip measurements (duration, counts) |
 
 ### Grain Definition
 
@@ -123,16 +130,18 @@ This means each row represents a single trip from one station to another.
 | hour_12 | INT | Hour in 12-hour format |
 | am_pm | STRING | AM or PM |
 
-### DimStation
+### DimStartStation and DimEndStation
 
 | Column | Type | Description |
 |--------|------|-------------|
-| station_key | INT | Surrogate key (auto-increment) |
+| station_key | INT | Role-specific surrogate key |
 | station_id | STRING | Original station ID |
 | station_name | STRING | Station name |
 | station_description | STRING | Location description |
 | latitude | DOUBLE | Latitude coordinate |
 | longitude | DOUBLE | Longitude coordinate |
+
+`gold.dim_start_station` contains stations used as trip origins, while `gold.dim_end_station` contains stations used as trip destinations. Each dimension has its own surrogate-key namespace.
 
 ### FactTrips
 
@@ -142,8 +151,8 @@ This means each row represents a single trip from one station to another.
 | date_key | INT | FK to DimDate |
 | start_time_key | INT | FK to DimTime (start) |
 | end_time_key | INT | FK to DimTime (end) |
-| start_station_key | INT | FK to DimStation (start) |
-| end_station_key | INT | FK to DimStation (end) |
+| start_station_key | INT | FK to `gold.dim_start_station` |
+| end_station_key | INT | FK to `gold.dim_end_station` |
 | duration_seconds | INT | Trip duration in seconds |
 | duration_minutes | DOUBLE | Trip duration in minutes |
 | trip_count | INT | Always 1 (for summing) |
@@ -183,9 +192,9 @@ Dimensions change. A bike station can be renamed, moved, or assigned a new descr
 | **Type 1** | Replace the current attribute values. History is not retained. | Current-state reports where historical attributes are not needed. |
 | **Type 2** | Create a new dimension row with a new surrogate key and validity dates. | Historical reporting where facts must use the attribute version that was valid at the event time. |
 
-The core notebook creates `dim_station` as a **Type 1** dimension. It represents the current station state and keeps the star-schema exercise simple.
+The core notebook creates `gold.dim_start_station` and `gold.dim_end_station` as **Type 1** dimensions. They represent the current station state separately for each trip role and keep the star-schema exercise simple.
 
-The optional `dim_station_scd2` extension demonstrates **Type 2** history with these columns:
+The optional `gold.dim_station_scd2` extension demonstrates **Type 2** history with these columns:
 
 | Column | Purpose |
 |--------|---------|
@@ -206,11 +215,12 @@ After completing this module, verify:
 
 | Check | How to Verify |
 |-------|---------------|
-| ✅ dim_date created | Check Tables/ in Lakehouse |
-| ✅ dim_time created | Check Tables/ in Lakehouse |
-| ✅ dim_station created | Has all unique stations |
-| ✅ dim_station_scd2 created (optional) | Has effective dates and one current version per station |
-| ✅ fact_trips created | All foreign keys populated |
+| ✅ gold.dim_date created | Check Tables/ in Lakehouse |
+| ✅ gold.dim_time created | Check Tables/ in Lakehouse |
+| ✅ gold.dim_start_station created | Has all valid origin stations |
+| ✅ gold.dim_end_station created | Has all valid destination stations |
+| ✅ gold.dim_station_scd2 created (optional) | Has effective dates and one current version per station |
+| ✅ gold.fact_trips created | All foreign keys populated |
 | ✅ Relationships valid | Join queries return expected results |
 
 ---
@@ -223,10 +233,10 @@ Do not compare your results with preset row counts. The source files can be part
 
 Use the model summary query in the notebook to capture the results. Then explain:
 
-- Why `dim_time` has a predictable number of minute slots.
-- Why `dim_date` depends on the observed trip date range.
-- Why `dim_station` depends on the stations present in the source files.
-- Why `fact_trips` depends on the valid Silver records and successful dimension joins.
+- Why `gold.dim_time` has a predictable number of minute slots.
+- Why `gold.dim_date` depends on the observed trip date range.
+- Why the two station dimensions depend on the valid origin and destination stations present in the source files.
+- Why `gold.fact_trips` depends on the valid Silver records and successful dimension joins.
 
 ### Sample Queries You Can Answer
 
