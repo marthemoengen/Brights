@@ -2,7 +2,7 @@
 
 ## 📖 Overview
 
-This module introduces the **accumulating snapshot** fact table — the most sophisticated of the three Kimball fact table patterns. You will build `fact_trip_lifecycle`, which tracks each individual bike trip through its lifecycle milestones.
+This module introduces the **accumulating snapshot** fact table — the most sophisticated of the three Kimball fact table patterns. You will build `gold.fact_trip_lifecycle`, which tracks each individual bike trip through its lifecycle milestones.
 
 ---
 
@@ -32,19 +32,19 @@ The key characteristics:
 
 ---
 
-## 🗂️ Table Design: `fact_trip_lifecycle`
+## 🗂️ Table Design: `gold.fact_trip_lifecycle`
 
 **Grain:** One row per bike trip.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | `trip_key` | BIGINT | Surrogate PK |
-| `start_date_key` | INT | FK → `dim_date` (Milestone 1) |
-| `start_time_key` | INT | FK → `dim_time` (Milestone 1) |
-| `end_date_key` | INT | FK → `dim_date` (Milestone 2) |
-| `end_time_key` | INT | FK → `dim_time` (Milestone 2) |
-| `start_station_key` | INT | FK → `dim_station` |
-| `end_station_key` | INT | FK → `dim_station` |
+| `start_date_key` | INT | FK → `gold.dim_date` (Milestone 1) |
+| `start_time_key` | INT | FK → `gold.dim_time` (Milestone 1) |
+| `end_date_key` | INT | FK → `gold.dim_date` (Milestone 2) |
+| `end_time_key` | INT | FK → `gold.dim_time` (Milestone 2) |
+| `start_station_key` | INT | FK → `gold.dim_start_station` |
+| `end_station_key` | INT | FK → `gold.dim_end_station` |
 | `milestone_1_started_at` | TIMESTAMP | When bike was unlocked |
 | `milestone_2_ended_at` | TIMESTAMP | When bike was returned |
 | `milestone_3_processed_at` | TIMESTAMP | When record was ingested |
@@ -59,25 +59,25 @@ The key characteristics:
 
 - **Multiple date/time FKs** let analysts answer "how long was the trip at the time it started?" and "how much time passed before it was processed?" independently
 - `is_complete = FALSE` identifies **in-flight** records — trips that started but haven't returned (possible in a real-time feed)
-- In production, use `MERGE INTO fact_trip_lifecycle USING new_milestones ON trip_key = ...` to update rows as each milestone arrives
+- In production, use `MERGE INTO gold.fact_trip_lifecycle USING new_milestones ON trip_key = ...` to update rows as each milestone arrives
 
 ---
 
 ## 🔗 Star Schema Diagram
 
 ```
-dim_date ◄──────────────────────────────────────► dim_date
+gold.dim_date ◄────────────────────────────────► gold.dim_date
 (start_date_key)                               (end_date_key)
        │                                              │
-       │           fact_trip_lifecycle               │
+     │           gold.fact_trip_lifecycle          │
        │    ┌──────────────────────────────────┐     │
        └───►│  trip_key                        │◄────┘
             │  start_date_key  (FK→dim_date)   │
 dim_time ──►│  start_time_key  (FK→dim_time)   │◄── dim_time
             │  end_date_key    (FK→dim_date)   │
             │  end_time_key    (FK→dim_time)   │
-            │  start_station_key (FK→dim_stn)  │◄── dim_station
-            │  end_station_key   (FK→dim_stn)  │◄── dim_station
+            │  start_station_key (FK→start)    │◄── gold.dim_start_station
+            │  end_station_key   (FK→end)      │◄── gold.dim_end_station
             │  milestone_1_started_at          │
             │  milestone_2_ended_at            │
             │  milestone_3_processed_at        │
@@ -96,7 +96,7 @@ dim_time ──►│  start_time_key  (FK→dim_time)   │◄── dim_time
 2. **Processing lag** — how quickly does the pipeline ingest completed trips?
 3. **Overnight trips** — flag unusual trips that span midnight
 4. **Route analysis** — which station-to-station pairs are most popular?
-5. **Time-of-day patterns** — join start_time_key to dim_time.time_period
+5. **Time-of-day patterns** — join `start_time_key` to `gold.dim_time.time_of_day`
 
 ---
 
@@ -104,4 +104,4 @@ dim_time ──►│  start_time_key  (FK→dim_time)   │◄── dim_time
 
 1. ✅ Completed Module 3 (Gold Layer)
 2. ✅ `silver_trips` table exists with valid data
-3. ✅ `dim_date`, `dim_time`, and `dim_station` tables exist
+3. ✅ `gold.dim_date`, `gold.dim_time`, `gold.dim_start_station`, and `gold.dim_end_station` tables exist

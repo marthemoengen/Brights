@@ -2,7 +2,7 @@
 
 ## 📖 Overview
 
-This module enriches the station dimension with **Oslo bydel** (borough/district) data by introducing `dim_station_location` — a new dimension table with its own surrogate key and a `bydel` column derived from station coordinates.
+This module enriches the station dimensions with **Oslo bydel** (borough/district) data by introducing `gold.dim_station_location` — a new dimension table with its own surrogate key and a `bydel` column derived from station coordinates.
 
 ---
 
@@ -11,7 +11,7 @@ This module enriches the station dimension with **Oslo bydel** (borough/district
 By the end of this module, you will:
 - Understand why a separate location dimension can be valuable alongside an existing station dimension
 - Assign stations to Oslo bydeler using coordinate-based lookup
-- Build `dim_station_location` with a surrogate `location_key`
+- Build `gold.dim_station_location` with a surrogate `location_key`
 - Query cross-bydel trip flows and origin/destination patterns
 
 ---
@@ -48,13 +48,13 @@ Oslo is officially divided into **15 urban districts (bydeler)**:
 
 ### Bydel Assignment Method
 
-We use a **bounding-box coordinate lookup** (latitude/longitude ranges) embedded in `ref_bydel`. This is a pedagogical simplification — in production you would use proper geometry functions (`ST_Within` with GeoJSON polygons, or H3 hexagonal indexing).
+We use a **bounding-box coordinate lookup** (latitude/longitude ranges) embedded in `gold.ref_bydel`. This is a pedagogical simplification — in production you would use proper geometry functions (`ST_Within` with GeoJSON polygons, or H3 hexagonal indexing).
 
 ---
 
 ## 🗂️ Table Design
 
-### `ref_bydel` (reference / lookup)
+### `gold.ref_bydel` (reference / lookup)
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -64,7 +64,7 @@ We use a **bounding-box coordinate lookup** (latitude/longitude ranges) embedded
 | `lon_min / lon_max` | DOUBLE | Longitude bounding box |
 | `area_type` | STRING | inner_city / outer_west / outer_east / outer_north / outer_south |
 
-### `dim_station_location`
+### `gold.dim_station_location`
 
 **Grain:** One row per station (current state).
 
@@ -73,7 +73,7 @@ We use a **bounding-box coordinate lookup** (latitude/longitude ranges) embedded
 | `location_key` | INT | **Surrogate PK** (independent of `station_key`) |
 | `station_id` | STRING | Business key — links to fact tables |
 | `station_name` | STRING | Station display name |
-| `description` | STRING | Street-level description |
+| `station_description` | STRING | Street-level description |
 | `latitude` | DOUBLE | GPS latitude (WGS84) |
 | `longitude` | DOUBLE | GPS longitude (WGS84) |
 | `bydel` | STRING | Oslo district name (or 'Unknown') |
@@ -83,8 +83,8 @@ We use a **bounding-box coordinate lookup** (latitude/longitude ranges) embedded
 
 ### Why a New Surrogate Key?
 
-`dim_station_location` has its own `location_key` rather than reusing `dim_station.station_key` because:
-1. It may cover a **different set of stations** (e.g., future expansion to include stations outside Oslo proper)
+`gold.dim_station_location` has its own `location_key` rather than reusing the role-specific keys from `gold.dim_start_station` or `gold.dim_end_station` because:
+1. It represents a conformed location view across both station roles
 2. It may change at a **different rate** — location/bydel classification is very stable, while station names or descriptions may change more often
 3. It teaches the principle that different dimensions model **different aspects** of the same real-world entity
 
@@ -94,7 +94,7 @@ We use a **bounding-box coordinate lookup** (latitude/longitude ranges) embedded
 
 ```
                 ┌────────────────────────┐
-                │   dim_station_location  │
+                │ gold.dim_station_location│
                 │────────────────────────│
                 │ location_key (PK)      │
                 │ station_id             │
@@ -126,4 +126,4 @@ We use a **bounding-box coordinate lookup** (latitude/longitude ranges) embedded
 ## 📋 Prerequisites
 
 1. ✅ Completed Module 3 (Gold Layer)
-2. ✅ `silver_trips` and `dim_station` tables exist
+2. ✅ `silver_trips`, `gold.dim_start_station`, and `gold.dim_end_station` tables exist

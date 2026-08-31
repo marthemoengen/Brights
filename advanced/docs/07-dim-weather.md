@@ -2,37 +2,36 @@
 
 ## 📖 Overview
 
-This module adds a **new external data source** — daily weather data for Oslo — and integrates it into the existing star schema as a **conformed dimension**. You will then run correlation queries to explore how weather influences bike-sharing behaviour.
+This module adds a **new external data source** — daily weather data for Oslo — and integrates it into the existing star schema as a daily weather dimension. You will then run correlation queries to explore how weather influences bike-sharing behaviour.
 
 ---
 
 ## 🎯 Learning Objectives
 
 By the end of this module, you will:
-- Understand the concept of a **conformed dimension** shared across multiple fact tables
+- Understand how a daily dimension can connect directly to a fact table through a shared key
 - Fetch real historical weather data from the Open-Meteo free API (no API key required)
-- Build `dim_weather` with temperature, precipitation, wind, and derived biking-suitability attributes
+- Build `gold.dim_weather` with temperature, precipitation, wind, and derived biking-suitability attributes
 - Correlate daily trip volumes with weather conditions
 
 ---
 
-## 🎓 Concept: Conformed Dimensions
+## 🎓 Concept: Weather as a Fact-Linked Dimension
 
-A **conformed dimension** is a dimension table that:
-- Uses the **same grain and same surrogate key** across multiple fact tables
-- Can be joined to any fact table in the warehouse without extra transformation
-- Is maintained centrally by the data engineering team
+`gold.dim_weather` has one row per calendar day. It uses `date_key`, the same daily key already stored in `gold.fact_trips`.
 
-`dim_weather` conforms to `dim_date` by sharing `date_key` (format `YYYYMMDD` INT):
+The important relationship is between weather and the fact table:
 
 ```
-dim_date ◄──── fact_trips (via date_key)
-    ▲
-    │  same date_key
-dim_weather ◄── join to any fact table via date_key
+gold.dim_weather ── date_key ──► gold.fact_trips
+                                      │
+                                      ├──► gold.dim_date
+                                      ├──► gold.dim_time
+                                      ├──► gold.dim_start_station
+                                      └──► gold.dim_end_station
 ```
 
-This means adding weather analysis to an **existing** fact table requires only a single additional `JOIN dim_weather dw ON dd.date_key = dw.date_key` — no new keys, no ETL changes to the fact table.
+`gold.dim_date` is still useful for calendar attributes such as month, weekday, and weekend flags. But weather does not need to connect through `gold.dim_date`; it can join directly to `gold.fact_trips` using `date_key`.
 
 ---
 
@@ -50,14 +49,14 @@ The notebook includes a **synthetic fallback** using Oslo climate normals, so it
 
 ---
 
-## 🗂️ Table Design: `dim_weather`
+## 🗂️ Table Design: `gold.dim_weather`
 
 **Grain:** One row per calendar day.  
-**Conforms to:** `dim_date` via `date_key`.
+**Connects to:** `gold.fact_trips` via `date_key`.
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `date_key` | INT | Surrogate / conforming key (YYYYMMDD) |
+| `date_key` | INT | Daily key used to join directly to fact tables (YYYYMMDD) |
 | `full_date` | DATE | Calendar date |
 | `temp_max_celsius` | DOUBLE | Daily maximum temperature |
 | `temp_min_celsius` | DOUBLE | Daily minimum temperature |
@@ -92,9 +91,9 @@ The World Meteorological Organisation (WMO) defines a standard set of numeric co
 
 ```
               ┌─────────────────┐
-              │    dim_weather   │
+              │ gold.dim_weather │
               │─────────────────│
-              │ date_key (PK)   │◄──── conforms to dim_date
+              │ date_key (PK)   │
               │ full_date       │
               │ temp_mean       │
               │ precipitation   │
@@ -105,17 +104,16 @@ The World Meteorological Organisation (WMO) defines a standard set of numeric co
               └────────┬────────┘
                        │ (join on date_key)
               ┌────────┴────────┐
-              │    dim_date     │
-              │─────────────────│
-              │ date_key (PK)   │
-              │ full_date       │
-              │ is_weekend      │
-              └────────┬────────┘
+              │ gold.fact_trips │
+              │────────────────│
+              │ date_key       │
+              │ duration       │
+              │ trip_count     │
+              └────────┬───────┘
                        │
               ┌────────┴────────┐
-              │   fact_trips    │
-              │ (or silver_trips│
-              │  for this module│
+              │ gold.dim_date   │
+              │ calendar attrs  │
               └─────────────────┘
 ```
 
@@ -126,7 +124,7 @@ The World Meteorological Organisation (WMO) defines a standard set of numeric co
 1. **Weather-volume correlation** — do more trips happen on sunny days?
 2. **Weather sensitivity by day type** — are weekenders more deterred by rain than commuters?
 3. **Temperature elasticity** — at what temperature does ridership peak?
-4. **Seasonal patterns** — combine with `dim_date.month` to see summer vs winter behaviour
+4. **Seasonal patterns** — join the fact to `gold.dim_date` when you need month or weekend attributes
 5. **Good biking days ranking** — rank months by proportion of good biking days
 
 ---
@@ -134,5 +132,5 @@ The World Meteorological Organisation (WMO) defines a standard set of numeric co
 ## 📋 Prerequisites
 
 1. ✅ Completed Module 3 (Gold Layer)
-2. ✅ `silver_trips`, `dim_date`, and `dim_station` tables exist
+2. ✅ `gold.fact_trips` and `gold.dim_date` tables exist
 3. ✅ Internet access OR acceptance of synthetic weather fallback
